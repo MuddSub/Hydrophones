@@ -1,5 +1,3 @@
-#Occam Kelly Graves
-#2019-10-13
 import math
 import numpy
 import random
@@ -46,7 +44,7 @@ class Signal:
         start = self.ping_start + self.distance / self.sound_speed
         if(start > self.ping_period - self.time_on):
             start -= self.ping_period
-
+        print(start)
         #create echo parameters for random echo
         echo_length = random.random() * 100
         echo_amp = random.uniform(0.3, 0.5)
@@ -64,12 +62,14 @@ class Signal:
         for i in range(samples):
             sig = 0
             #add ping sine wave if sensor is recieving a ping
+            #print((i / self.sample_rate - start), self.time_on);
             if(((i / self.sample_rate - start) % self.ping_period) < self.time_on):
                 sig += calc_sine(self.distance, i / self.sample_rate, self.frequency, self.sound_speed, 1)
             #add echo sine wave if sensor is recieving an echo
             if(((i / self.sample_rate - echo_start) % self.ping_period) < self.time_on):
                 sig += calc_sine(self.distance + echo_length, i / self.sample_rate, echo_freq, self.sound_speed, echo_amp)
             #add noise
+            #print(i, sig)
             signal.append(sig + noise_array[i])
 
         return signal

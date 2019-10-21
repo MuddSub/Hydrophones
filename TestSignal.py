@@ -1,5 +1,3 @@
-#Occam Kelly Graves
-#2019-10-13
 import Signal
 
 import matplotlib.pyplot as plt
@@ -32,7 +30,8 @@ def main():
     for i in range(len(coords)):
         signals.append(Signal.Signal(d, angle, coords[i], freq, sos, sr, read, noise, time_on, ping_period, ping_start).signals)
     times = numpy.arange(0, read, 1/sr)
-
+    print(times,signals)
     graph_signals(times, signals)
 
-main()
+if __name__ == "__main__":
+    main()
