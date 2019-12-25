@@ -34,7 +34,6 @@ class Signal:
         self.time_on = time_on #ms
         self.ping_period = ping_period #ms
         self.ping_start = ping_start #ms
-
         self.signals = self.generate_signals()
 
     ###generate complete simulated signal reading array for the sensor
@@ -42,34 +41,31 @@ class Signal:
         signal = []
         #determine the start time of the first ping
         start = self.ping_start + self.distance / self.sound_speed
-        if(start > self.ping_period - self.time_on):
-            start -= self.ping_period
-        print(start)
+        
+     
         #create echo parameters for random echo
-        echo_length = random.random() * 100
+        echo_length = random.random() * 3
         echo_amp = random.uniform(0.3, 0.5)
         echo_freq = random.uniform(0.9, 1.1) * self.frequency
         #determine the start time of the echo's first ping
-        echo_start = self.ping_start + self.distance + echo_length / self.sound_speed
-        if(echo_start > self.ping_period - self.time_on):
-            echo_start -= self.ping_period
-
+        echo_start = self.ping_start + (self.distance + echo_length) / self.sound_speed
         #calculate the total number of samples for the sensor
         samples = math.floor(self.sample_rate * self.read_time)
         #create a noise array to add to the pings
         noise_array = numpy.random.normal(0, self.noise, samples)
         #calculate each ping reading with echoes
+        print(start)
         for i in range(samples):
             sig = 0
             #add ping sine wave if sensor is recieving a ping
-            #print((i / self.sample_rate - start), self.time_on);
+            #((i / self.sample_rate - start), self.time_on);
             if(((i / self.sample_rate - start) % self.ping_period) < self.time_on):
+                #print(i, i/self.sample_rate)
                 sig += calc_sine(self.distance, i / self.sample_rate, self.frequency, self.sound_speed, 1)
             #add echo sine wave if sensor is recieving an echo
-            if(((i / self.sample_rate - echo_start) % self.ping_period) < self.time_on):
-                sig += calc_sine(self.distance + echo_length, i / self.sample_rate, echo_freq, self.sound_speed, echo_amp)
+            #if(((i / self.sample_rate - echo_start) % self.ping_period) < self.time_on):
+            #    sig += calc_sine(self.distance + echo_length, i / self.sample_rate, echo_freq, self.sound_speed, echo_amp)
             #add noise
-            #print(i, sig)
             signal.append(sig + noise_array[i])
 
         return signal
