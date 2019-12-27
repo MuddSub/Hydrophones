@@ -6,9 +6,9 @@ import random
 #coords: [x, y] distances in m from ref point
 #distance: distance to ref point
 #angle: between x-axis and ping to ref point
-def calc_distance(coords, distance, angle):
-    x_source = distance * math.cos(angle)
-    y_source = distance * math.sin(angle)
+def calc_distance(coords, source):
+    x_source = source[0]
+    y_source = source[1]
     return math.sqrt((coords[0] - x_source)**2 + (coords[1] - y_source)**2)
 
 ###calculate a single reading of the sensor (pure sine wave)
@@ -18,14 +18,16 @@ def calc_distance(coords, distance, angle):
 #sound_speed: current speed of sound (m/ms)
 #amplitude: amplitude of sine wave
 def calc_sine(distance, time, frequency, sound_speed, amplitude):
-    tot_time = distance / sound_speed + time
-    return amplitude * math.sin(2 * math.pi * frequency * tot_time)
+    tot_time = time-distance / sound_speed
+    if time>0:
+        return amplitude * math.sin(2 * math.pi * frequency * tot_time)
+    else:
+        return 0
 
 class Signal:
     ###initializer
-    def __init__(self, distance, angle, coords, frequency, sound_speed, sample_rate, read_time, noise, time_on, ping_period, ping_start):
-        self.distance = calc_distance(coords, distance, angle) #m
-        self.angle = angle #rad between 0 and pi
+    def __init__(self, source, coords, frequency, sound_speed, sample_rate, read_time, noise, time_on, ping_period, ping_start):
+        self.distance = calc_distance(coords, source) #m
         self.frequency = frequency #kHz
         self.sound_speed = sound_speed #m/ms
         self.sample_rate = sample_rate #kHz
@@ -45,7 +47,7 @@ class Signal:
      
         #create echo parameters for random echo
         echo_length = random.random() * 3
-        echo_amp = random.uniform(0.3, 0.5)
+        echo_amp = random.uniform(0.2, 0.4)
         echo_freq = random.uniform(0.9, 1.1) * self.frequency
         #determine the start time of the echo's first ping
         echo_start = self.ping_start + (self.distance + echo_length) / self.sound_speed
