@@ -2,6 +2,15 @@
 #include <bitset>
 
 Hydrophones::Hydrophones(){
+
+	//Disable CRC
+	std::vector<word> data = {0xFD00, 0x0001, 0x3307};
+	spiWrite(CRC_EN, data);
+
+	//configure PLL: integer_div = 0x6, en = 1, input_prescale = 0x1, type-0
+	regSetBit()
+
+
 	return;
 }
 
@@ -56,6 +65,36 @@ void Hydrophones::setBits(word& data, word mask, bool value){
 	data &= mask;
 }
 
+word Hydrophones::regSetBit(word addr, int pos, bool value){
+	word data = spiRead(addr);
+	setBit(data, pos, value);
+	spiWrite(addr,data);
+	return data;
+}
+
+word Hydrophones::regSetBits(word addr, word mask, bool value){
+	word data = spiRead(addr);
+	setBits(data, mask, value);
+	spiWrite(addr,data);
+	return data;
+}
+
+word Hydrophones::setRegRange(word addr, int startPos, int endPos, word value){
+	word data = spiRead(addr);
+
+	//mask for setting zeros to ones
+	word mask = value << startPos;
+
+	data |= mask;
+
+	//mask for setting ones to zeros needs padding of 1s on both sides of the value mask
+	mask |= 0xFFFF << endPos | 0xFFFF >> (16-startPos);
+	data &= mask;
+
+	spiWrite(addr, data);
+
+	return data;
+}
 
 int main(){
 	return 0;
