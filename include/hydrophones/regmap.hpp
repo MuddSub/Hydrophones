@@ -55,6 +55,7 @@
 #define ADC_DOUT2_PIN (0x28B)
 #define ADC_DOUT3_PIN (0x28C)
 #define ADC_DOUT4_PIN (0x28D)
+#define ADC_DOUT5_PIN (0x28E)
 #define DATA_READY_PIN (0x291)
 #define XTAL_CTRL (0x292)
 #define ADC_SETTING1 (0x301)
@@ -64,8 +65,30 @@
 #define CRC_EN (0xFD00)
 
 
+//Pins (all in terms of WiringPI numbers)
+#define N_CONV_START_PIN 7    //BCM 4
+#define N_FAULT_PIN 27        //BCM 16
+#define N_PG_PIN 25           //BCM 26
+#define SW1_PIN 23            //BCM 13
+#define SW2_PIN 26            //BCM 12
+#define N_STATUS_R_PIN 1      //BCM 18
+#define N_STATUS_G_PIN 24     //BCM 19
+#define N_STATUS_B_PIN 28     //BCM 20
+#define N_RESET_PWDN_PIN 6    //BCM 25
+#define DATA_READY_PIN 22     //BCM 6
+#define SCLK_ADC_PIN 21       //BCM 5
 
+//These are in terms of the broadcom pins, because that's how we read them
+#define DIN_PIN_0 24
+#define DIN_PIN_1 22
+#define DIN_PIN_2 21
+#define DIN_PIN_3 27
+#define DIN_PIN_4 18
+#define DIN_PIN_5 17
+#define DIN_PIN_6 15
+#define DIN_PIN_7 14
 
-
+#define RPI_GPILEV0 (0x7E200034)
+#define RPI_GLILEV1 (0x7E200038)
 
 #endif

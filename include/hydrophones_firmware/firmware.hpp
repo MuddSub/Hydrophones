@@ -1,16 +1,21 @@
 #ifndef HPHONES_FWARE
 #define HPHONES_FWARE
 
+#if __aarch64__
 #include <wiringPi.h>
+#endif
+
 #include <vector>
 #include "hydrophones/regmap.hpp"
+#include "ros/ros.h"
 
 class Hydrophones{
 
-typedef unsigned short word;
+typedef uint16_t word;
+typedef uint32_t raspiReg;
 
 static const int channel = 0;
-static const int addr15 = 0;
+static const char addr15 = 0;
 
 //max words we can write at once
 static const int maxWrite = 4;
@@ -18,6 +23,9 @@ static const int maxWrite = 4;
 public:
 	Hydrophones();
 
+
+
+	// ------- SPI Interface: -------
 	//read/write to register map
 	void spiWrite(word addr, word data);
 	void spiWrite(word addr, std::vector<word> data);
@@ -29,6 +37,10 @@ public:
 	word regSetRange(word addr, int startPos, int endPos, word value);
 
 
+	// ------- Sampling -------
+	void sample();
+
+
 private:
 	bool spiErr;
 
@@ -36,6 +48,23 @@ private:
 	void setBit(word& data, int pos, bool value);
 	//given a word and a mask, set the bits corresponding to 1s in the mask to value
 	void setBits(word& data, word mask, bool value);
+
+	bool aquiring = false;
+	inline void startAquisition(){
+		digitalWrite(CONV_START_PIN, LOW);
+		aquiring = true;
+	}
+	inline void stopAquisition(){
+		digitalWrite(CONV_START_PIN, HIGH);
+		aquiring = false;
+	}
+
+	inline void dataReady(){return digitalRead(DATA_READY_PIN);}
+	inline void clockState(){return digitalRead(SCLK_ADC_PIN);}
+
+	std::Vector<raspiReg> samples;
+
+
 
 };
 

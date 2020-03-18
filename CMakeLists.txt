@@ -206,7 +206,7 @@ include_directories(
 # catkin_add_nosetests(test)
 
 add_executable(firmware src/firmware.cpp)
-target_link_libraries(firmware ${catkin_LIBRARIES} -lwiringPi)
+target_link_libraries(firmware ${catkin_LIBRARIES})
 add_dependencies(firmware
 	${${PROJECT_NAME}_EXPORTED_TARGETS}
 	${catkin_EXPORTED_TARGETS}
