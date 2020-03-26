@@ -6,10 +6,13 @@
 #endif
 
 #include <vector>
-#include "hydrophones/regmap.hpp"
 #include "ros/ros.h"
+#include "ros/package.h"
+#include "hydrophones/regmap.hpp"
 
 class Hydrophones{
+
+
 
 typedef uint16_t word;
 typedef uint32_t raspiReg;
@@ -38,8 +41,8 @@ public:
 
 
 	// ------- Sampling -------
-	void sample();
-
+	void sample(float secs);
+	void processSamples(bool readFromFile);
 
 private:
 	bool spiErr;
@@ -62,9 +65,22 @@ private:
 	inline void dataReady(){return digitalRead(DATA_READY_PIN);}
 	inline void clockState(){return digitalRead(SCLK_ADC_PIN);}
 
-	std::Vector<raspiReg> samples;
+	std::vector<raspiReg> rawSamples;
+	std::vector<word> samples;
+	bool samplesProcessed = false;
+	std::vector<std::string> rawSampleFiles;
+	std::vector<std::string> processedSampleFiles;
+
+	std::string rawFilePath;
+	std::string processedFilePath;
+
+	unsigned int sampleCounter = 0;
+
+	uint8_t getByteFromReg(raspiReg reg);
 
 
+	unsigned int dataPins[8] = {DIN_PIN_0, DIN_PIN_1, DIN_PIN_2, DIN_PIN_3,
+	                            DIN_PIN_4, DIN_PIN_5, DIN_PIN_6, DIN_PIN_7};
 
 };
 

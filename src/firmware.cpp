@@ -2,11 +2,40 @@
 #include <bitset>
 #include <time.h>
 #include <chrono>
+#include <fstream>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 
 Hydrophones::Hydrophones(){
 
 
 	stopAquisition();
+
+
+	//Create directories for storing stuff
+	std::string path = ros::package::getPath("hydrophones");
+	int t = (int)ros::Time::now().toSec();
+	std::string fullPath = path + "/samples";
+	if (mkdir(path + (std::string)t, 0777) == -1)
+		std::cerr << "Error :  " << strerror(errno) << std::endl;
+	else
+		std::cout << "Directory created";
+
+	rawFilePath = path + (std::string)t+"/raw";
+	processedFilePath = path + (std::string)t+"/processed";
+
+	if (mkdir(processedFilePath, 0777) == -1)
+        std::cerr << "Error :  " << strerror(errno) << std::endl;
+  else
+    std::cout << "Directory created";
+
+	if (mkdir(rawFilePath, 0777) == -1)
+    std::cerr << "Error :  " << strerror(errno) << std::endl;
+  else
+  	std::cout << "Directory created";
+
+
 
 	//Disable CRC
 	std::vector<word> data = {0xFD00, 0x0001, 0x3307};
@@ -47,16 +76,20 @@ Hydrophones::Hydrophones(){
 	regSetBit(MISO_PIN, 2, 1);
 	regSetBit(MOSI_PIN, 2, 1);
 	regSetBit(MISO_PIN, 2, 1);
-	regSetBit(ADDR15_PIN, 2, 1); //TODO: check this. tis enables pull-down, do we want?
-	regSetBit(FS_ADC_PIN, 2, 1);
+	regSetBit(SCLK_ADC_PIN, 2, 1);
 	regSetBit(CS_PIN, 2, 1);
-	//TODO: check if we want pull down on sclk_adc
+	regSetBit(SS_PIN, 2, 1);
+	regSetBit(FAULT_PIN, 2, 1);
+
 	regSetBit(ADC_DOUT0_PIN, 2, 1);
 	regSetBit(ADC_DOUT1_PIN, 2, 1);
 	regSetBit(ADC_DOUT2_PIN, 2, 1);
 	regSetBit(ADC_DOUT3_PIN, 2, 1);
 	regSetBit(ADC_DOUT4_PIN, 2, 1);
 	regSetBit(ADC_DOUT5_PIN, 2, 1);
+	regSetBit(ADDR15_PIN, 2, 1);
+	regSetBit(FS_ADC_PIN, 2, 1);
+
 
 	//TODO: how does peak detect work?
 
@@ -164,8 +197,12 @@ Hydrophones::word Hydrophones::regSetRange(word addr, int startPos, int endPos, 
 	return data;
 }
 
-void sample(){
-	clock_t numTicks = sampleDuration * CLOCKS_PER_SEC;
+void Hydrophones::sample(float secs){
+
+	rawSamples = std::vector<raspiReg>();
+	samplesProcessed = false;
+
+	clock_t numTicks = secs * CLOCKS_PER_SEC;
 
 	bool prevSclk = true;
 	clock_t t = clock();
@@ -177,14 +214,67 @@ void sample(){
 		sclk = clockState();
 		if(!sclk && prevSclk){
 			volatile raspiReg value = *RPI_GPILEV0;
-			samples.push_back(value);
+			rawSamples.push_back(value);
 		}
 		prevSclk = sclk;
 	}while(clock() - t < numTicks)
 
 	sampling = false;
+
+	//write to txt
+	std::string path = rawFilePath + "/" + (std::string)sampleCounter;
+	std::ofstream file;
+	file.open(path);
+	rawSampleFiles.push_back(path);
+	for(auto i : rawSamples)
+		file << i << std::endl;
+
+	++sampleCounter;
 }
 
+void Hydrophones::processSamples(std::vector<raspiReg> rawSamples){
+	//We need an even number of readings, since each measurement is two readings
+
+	int len = rawSamples.size();
+
+	if(rawSamples.size() % 2 == 1){
+		--len;
+		rawSamples.pop_back();
+	}
+
+	for(int i = 0; i < len/2; ++i){
+		raspiReg highReg = rawSamples.at(2*i);
+		raspiReg lowReg = rawSamples.at(2*i+1);
+
+		uint8_t msb = getByteFromReg(highReg);
+		uint8_t lsb = getByteFromReg(lowReg);
+
+		//assemble the bits
+		word sample = (msb << 8) | lsb;
+		samples.push_back(sample);
+	}
+
+	//write to txt
+	std::string path = processedFilePath + "/" + (std::string)sampleCounter;
+	std::ofstream file;
+	file.open(path);
+	processedSampleFiles.push_back(path);
+	for(auto i : samples)
+		file << i << std::endl;
+}
+
+uint8_t Hydrophones::getByteFromReg(raspiReg reg){
+	uint8_t result = 0;
+	for(int i = 0; i < 8; ++i){
+		int pos = dataPins[i];
+
+		//wipe out all the bits but the one we care about
+		raspiReg mask = (1 << pos);
+		uint8_t bit= (mask & pos) >> pos;
+		result |= (bit << i);
+	}
+	return result;
+}
 
 int main(){
 	Hydrophones system;
