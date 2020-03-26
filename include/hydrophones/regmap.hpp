@@ -15,7 +15,6 @@ volatile uint16_t* const  ASIL_MASK = (uint16_t*) 0x081;
 volatile uint16_t* const  ASIL_FLAG = (uint16_t*) 0x082;
 volatile uint16_t* const  ASIL_ERROR = (uint16_t*) 0x083;
 volatile uint16_t* const  CRC_VALUE_L = (uint16_t*) 0x084;
-volatile uint16_t* const  CRC_VALUE_L = (uint16_t*) 0x084;
 volatile uint16_t* const  CRC_VALUE_H = (uint16_t*) 0x085;
 volatile uint16_t* const  RM_CRC_ENABLE = (uint16_t*) 0x086;
 volatile uint16_t* const  RM_CRC_DONE = (uint16_t*) 0x087;
@@ -65,18 +64,18 @@ volatile uint16_t* const  DEJITTER_WINDOW = (uint16_t*) 0x30E;
 volatile uint16_t* const  CRC_EN = (uint16_t*) 0xFD00;
 
 
-//Pins (all in terms of WiringPI numbers;
-#define N_CONV_START_PIN 7    //BCM 4
-#define N_FAULT_PIN 27        //BCM 16
-#define N_PG_PIN 25           //BCM 26
-#define SW1_PIN 23            //BCM 13
-#define SW2_PIN 26            //BCM 12
-#define N_STATUS_R_PIN 1      //BCM 18
-#define N_STATUS_G_PIN 24     //BCM 19
-#define N_STATUS_B_PIN 28     //BCM 20
-#define N_RESET_PWDN_PIN 6    //BCM 25
-#define DATA_READY_PIN 22     //BCM 6
-#define SCLK_ADC_PIN 21       //BCM 5
+//Pins (all in terms of WiringPI numbers)
+#define RPI_N_CONV_START_PIN 7    //BCM 4
+#define RPI_N_FAULT_PIN 27        //BCM 16
+#define RPI_N_PG_PIN 25           //BCM 26
+#define RPI_SW1_PIN 23            //BCM 13
+#define RPI_SW2_PIN 26            //BCM 12
+#define RPI_N_STATUS_R_PIN 1      //BCM 18
+#define RPI_N_STATUS_G_PIN 24     //BCM 19
+#define RPI_N_STATUS_B_PIN 28     //BCM 20
+#define RPI_N_RESET_PWDN_PIN 6    //BCM 25
+#define RPI_DATA_READY_PIN 22     //BCM 6
+#define RPI_SCLK_ADC_PIN 21       //BCM 5
 
 //These are in terms of the broadcom pins, because that's how we read them
 #define DIN_PIN_0 24

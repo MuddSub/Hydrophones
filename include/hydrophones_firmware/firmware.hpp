@@ -1,10 +1,8 @@
 #ifndef HPHONES_FWARE
 #define HPHONES_FWARE
 
-#if __aarch64__
 #include <wiringPi.h>
-#endif
-
+#include <wiringPiSPI.h>
 #include <vector>
 #include "ros/ros.h"
 #include "ros/package.h"
@@ -42,7 +40,7 @@ public:
 
 	// ------- Sampling -------
 	void sample(float secs);
-	void processSamples(bool readFromFile);
+	void processSamples();
 
 private:
 	bool spiErr;
@@ -54,16 +52,16 @@ private:
 
 	bool aquiring = false;
 	inline void startAquisition(){
-		digitalWrite(CONV_START_PIN, LOW);
+		digitalWrite(RPI_N_CONV_START_PIN, LOW);
 		aquiring = true;
 	}
 	inline void stopAquisition(){
-		digitalWrite(CONV_START_PIN, HIGH);
+		digitalWrite(RPI_N_CONV_START_PIN, HIGH);
 		aquiring = false;
 	}
 
-	inline void dataReady(){return digitalRead(DATA_READY_PIN);}
-	inline void clockState(){return digitalRead(SCLK_ADC_PIN);}
+	inline bool dataReady(){return digitalRead(RPI_DATA_READY_PIN);}
+	inline bool clockState(){return digitalRead(RPI_SCLK_ADC_PIN);}
 
 	std::vector<raspiReg> rawSamples;
 	std::vector<word> samples;

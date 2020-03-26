@@ -16,21 +16,20 @@ Hydrophones::Hydrophones(){
 	//Create directories for storing stuff
 	std::string path = ros::package::getPath("hydrophones");
 	int t = (int)ros::Time::now().toSec();
-	std::string fullPath = path + "/samples";
-	if (mkdir(path + (std::string)t, 0777) == -1)
+	if (mkdir((path + std::to_string(t)).c_str(), 0777) == -1)
 		std::cerr << "Error :  " << strerror(errno) << std::endl;
 	else
 		std::cout << "Directory created";
 
-	rawFilePath = path + (std::string)t+"/raw";
-	processedFilePath = path + (std::string)t+"/processed";
+	rawFilePath = path + std::to_string(t)+"/raw";
+	processedFilePath = path + std::to_string(t)+"/processed";
 
-	if (mkdir(processedFilePath, 0777) == -1)
+	if (mkdir(processedFilePath.c_str(), 0777) == -1)
         std::cerr << "Error :  " << strerror(errno) << std::endl;
   else
     std::cout << "Directory created";
 
-	if (mkdir(rawFilePath, 0777) == -1)
+	if (mkdir(rawFilePath.c_str(), 0777) == -1)
     std::cerr << "Error :  " << strerror(errno) << std::endl;
   else
   	std::cout << "Directory created";
@@ -117,9 +116,7 @@ Hydrophones::word Hydrophones::spiRead(word addr){
 	buffer[0] = addr15<<1; //set bit 1 to 1 or 0 accordingly, bit 0 is always 0
 	buffer[1] = addr >> 8;     //shift to get only MSB
 	buffer[2] = (addr & 0xFF); //mask MSB with zeros
-	#if __aarch64__
 	int err = wiringPiSPIDataRW(channel, buffer, 3);
-	#endif
 	word result = buffer[0];
 	result |= (buffer[1] << 8);
 	return result;
@@ -135,9 +132,7 @@ void Hydrophones::spiWrite(word addr, std::vector<word> data){
 		buffer[i+3] = data[i] >> 8;     //shift to get only MSB
 		buffer[i+4] = (data[i] & 0xFF); //mask MSB with zeros
 	}
-	#if __aarch64__
 	int err = wiringPiSPIDataRW(channel, buffer, len);
-	#endif
 }
 
 void Hydrophones::spiWrite(word addr, word data){
@@ -213,8 +208,7 @@ void Hydrophones::sample(float secs){
 	do{
 		sclk = clockState();
 		if(!sclk && prevSclk){
-			volatile raspiReg value = *RPI_GPILEV0;
-			rawSamples.push_back(value);
+			rawSamples.push_back(*RPI_GLILEV0);
 		}
 		prevSclk = sclk;
 	}while(clock() - t < numTicks)
@@ -222,7 +216,7 @@ void Hydrophones::sample(float secs){
 	sampling = false;
 
 	//write to txt
-	std::string path = rawFilePath + "/" + (std::string)sampleCounter;
+	std::string path = rawFilePath + "/" + std::to_string(sampleCounter);
 	std::ofstream file;
 	file.open(path);
 	rawSampleFiles.push_back(path);
@@ -232,7 +226,7 @@ void Hydrophones::sample(float secs){
 	++sampleCounter;
 }
 
-void Hydrophones::processSamples(std::vector<raspiReg> rawSamples){
+void Hydrophones::processSamples(){
 	//We need an even number of readings, since each measurement is two readings
 
 	int len = rawSamples.size();
@@ -255,7 +249,7 @@ void Hydrophones::processSamples(std::vector<raspiReg> rawSamples){
 	}
 
 	//write to txt
-	std::string path = processedFilePath + "/" + (std::string)sampleCounter;
+	std::string path = processedFilePath + "/" + std::to_string(sampleCounter);
 	std::ofstream file;
 	file.open(path);
 	processedSampleFiles.push_back(path);
