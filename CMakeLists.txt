@@ -4,7 +4,6 @@ project(hydrophones)
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
 
-add_compile_options(-lwiringPi)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -13,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  roslib
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,7 +107,7 @@ find_package(catkin REQUIRED COMPONENTS
 catkin_package(
    INCLUDE_DIRS include
 #  LIBRARIES hydrophones
-#  CATKIN_DEPENDS roscpp rospy std_msgs
+   CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -207,8 +207,8 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(firmware src/firmware.cpp)
-target_link_libraries(firmware ${catkin_LIBRARIES})
+add_executable(firmware src/ADAR7251.cpp)
+target_link_libraries(firmware ${catkin_LIBRARIES} wiringPi)
 add_dependencies(firmware
 	${${PROJECT_NAME}_EXPORTED_TARGETS}
 	${catkin_EXPORTED_TARGETS}

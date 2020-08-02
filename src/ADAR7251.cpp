@@ -1,4 +1,4 @@
-#include "hydrophones_firmware/firmware.hpp"
+#include "hydrophones/ADAR7251.hh"
 #include <bitset>
 #include <time.h>
 #include <chrono>
@@ -6,12 +6,27 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+namespace MuddSub::Acoustics
+{
 
-Hydrophones::Hydrophones(){
+Hydrophones::Hydrophones()
+{
 
+	wiringPiSetup();
+	wiringPiSPISetup(0, 500000);
 
+	for(auto i : raspiInputPins)
+		pinMode(i, INPUT);
+	for(auto i : raspiOutputPins)
+		pinMode(i, OUTPUT);
+
+	powerOff();
 	stopAquisition();
+	digitalWrite(RPI_N_STATUS_R_PIN, HIGH);
+	digitalWrite(RPI_N_STATUS_G_PIN, HIGH);
+	digitalWrite(RPI_N_STATUS_B_PIN, HIGH);
 
+	powerOn();
 
 	//Create directories for storing stuff
 	std::string path = ros::package::getPath("hydrophones");
@@ -33,14 +48,30 @@ Hydrophones::Hydrophones(){
     std::cerr << "Error :  " << strerror(errno) << std::endl;
   else
   	std::cout << "Directory created";
-
+	word_t test;
+	int skipOne = 0;
+	while(ros::ok())
+	{
+		test = spiRead(ADC_SETTING1);
+		// Needed a register which defaults to non-zero, but we also change most of those later...
+		if(test == 0x304) break;
+		ROS_ERROR("SPI Read Test on ADC_SETTING1 failed with value %d. Trying again",test);
+		skipOne = 1;
+		sleep(1);
+	}
+	std::cout << "Test passed" << std::endl;
 
 
 	//Disable CRC
-	std::vector<word> data = {0xFD00, 0x0001, 0x3307};
-	spiWrite(CRC_EN, data);
+	while(ros::ok())
+	{
+		std::vector<word_t> data = {0x0001, 0x3307};
+		spiWrite(CRC_EN, data);
+		if(spiRead(CRC_EN)) break;
+		ROS_ERROR("Failed to disable CRC. Trying again");
 
-
+		sleep(1);
+	}
 
 	//PLL CONFIG
 	regSetRange(PLL_CTRL, 11, 15, 6); //pll_integer_div=6
@@ -51,13 +82,16 @@ Hydrophones::Hydrophones(){
 	regSetBit(CLK_CTRL, 0, 0);       //use pll clock
 
 	//TODO: timeout
-	while(!spiRead(PLL_LOCK))
+	while(!spiRead(PLL_LOCK) && ros::ok()){
+		ROS_WARN("Waiting for PLL Lock");
 		continue;
+	}
+	ROS_INFO("PLL Lock Aquired");
 
 
 	//Power Enable
-	regSetBit(POWER_ENABLE, 0, 0);   //Disable clock generator
-	regSetBit(POWER_ENABLE, 1, 0);   //Disable Serial Output
+	//regSetBit(POWER_ENABLE, 0, 0);   //Disable clock generator
+	//regSetBit(POWER_ENABLE, 1, 0);   //Disable Serial Output
 
 	//Decimator set to 300kHz
 	regSetRange(DECIM_RATE, 0, 2, 7);
@@ -102,48 +136,89 @@ Hydrophones::Hydrophones(){
 	regSetBit(MASTER_ENABLE, 0, 1);
 
 	//check for error
-	while(spiRead(ASIL_FLAG)){
-		ROS_ERROR("ADAR7251 Error Code %d", spiRead(ASIL_ERROR));
+	skipOne = 0;
+	while(spiRead(ASIL_FLAG))
+	{
+		if(skipOne)
+			ROS_ERROR("ADAR7251 Error Code %d", spiRead(ASIL_ERROR));
+		skipOne = 1;
 		regSetBit(ASIL_CLEAR, 0, 1);
+		sleep(2);
+	}
+	ROS_INFO("ADAR7251 Initialization Complete; no errors reported.");
+
+
+  // Open gpio register
+
+  int fd = open("/dev/gpiomem", O_RDWR | O_SYNC);
+
+  if (fd < 0)
+    ROS_ERROR("failed to open /dev/gpiomem");
+	else
+	{
+		gpioRegOpen_ = true;
+		ROS_INFO("Opened GPIO memory");
 	}
 
-	return;
+  gpioReg_ = (volatile uint32_t *)mmap(NULL, 0xB4, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+
+  close(fd);
+  return;
 }
 
 
-Hydrophones::word Hydrophones::spiRead(word addr){
-	unsigned char buffer[3];
-	buffer[0] = addr15<<1; //set bit 1 to 1 or 0 accordingly, bit 0 is always 0
+Hydrophones::~Hydrophones()
+{
+	powerOff();
+	stopAquisition();
+}
+
+Hydrophones::word_t Hydrophones::spiRead(word_t addr)
+{
+	unsigned char buffer[5];
+	buffer[0] = 0x1 | (addr15<<1); //set bit 1 to 1 or 0 accordingly, bit 0 is always 1 for read mode
 	buffer[1] = addr >> 8;     //shift to get only MSB
 	buffer[2] = (addr & 0xFF); //mask MSB with zeros
-	int err = wiringPiSPIDataRW(channel, buffer, 3);
-	word result = buffer[0];
-	result |= (buffer[1] << 8);
+	buffer[3] = 0;
+	buffer[4] = 0;
+	int err = wiringPiSPIDataRW(channel, buffer, 5);
+	word_t result = buffer[4];
+	result |= (buffer[3] << 8);
 	return result;
 }
 
-void Hydrophones::spiWrite(word addr, std::vector<word> data){
+void Hydrophones::spiWrite(word_t addr, std::vector<word_t> data)
+{
 	unsigned char buffer[maxWrite*2 + 1];
 	int len = 2*data.size() + 3;
-	buffer[0] = 0x1 | (addr15 << 1); //Set address, then to write mode
+	buffer[0] = addr15 << 1; //Set address, and bit 0 is always 0 for write mode
 	buffer[1] = addr >> 8;     //shift to get only MSB
-	buffer[2] = (addr & 0xFF); //mask MSB with zeros
-	for(int i = 0; i < data.size(); ++i){
-		buffer[i+3] = data[i] >> 8;     //shift to get only MSB
-		buffer[i+4] = (data[i] & 0xFF); //mask MSB with zeros
+	buffer[2] = (addr & 0x00FF); //mask MSB with zeros
+	for(int i = 0; i < data.size(); ++i)
+	{
+		buffer[2*i+3] = data[i] >> 8;     //shift to get only MSB
+		buffer[2*i+4] = (data[i] & 0xFF); //mask MSB with zeros
+	}
+	for(int i = data.size(); i < maxWrite; ++i)
+	{
+		buffer[2*i+3] = 0;
+		buffer[2*i+4] = 0;
 	}
 	int err = wiringPiSPIDataRW(channel, buffer, len);
 }
 
-void Hydrophones::spiWrite(word addr, word data){
-	std::vector<word> v;
+void Hydrophones::spiWrite(word_t addr, word_t data)
+{
+	std::vector<word_t> v;
 	v.push_back(data);
 	spiWrite(addr, v);
 }
 
-void Hydrophones::setBit(word& data, int pos, bool value){
-	word mask = (1 << pos);
-	if(value == 1){
+void Hydrophones::setBit(word_t& data, int pos, bool value)
+{
+	word_t mask = (1 << pos);
+	if(value == 1)
+	{
 		data |= mask;
 		return;
 	}
@@ -152,8 +227,10 @@ void Hydrophones::setBit(word& data, int pos, bool value){
 	data &= mask;
 }
 
-void Hydrophones::setBits(word& data, word mask, bool value){
-	if(value == 1){
+void Hydrophones::setBits(word_t& data, word_t mask, bool value)
+{
+	if(value == 1)
+	{
 		data |= mask;
 		return;
 	}
@@ -161,25 +238,28 @@ void Hydrophones::setBits(word& data, word mask, bool value){
 	data &= mask;
 }
 
-Hydrophones::word Hydrophones::regSetBit(word addr, int pos, bool value){
-	word data = spiRead(addr);
+Hydrophones::word_t Hydrophones::regSetBit(word_t addr, int pos, bool value)
+{
+	word_t data = spiRead(addr);
 	setBit(data, pos, value);
 	spiWrite(addr,data);
 	return data;
 }
 
-Hydrophones::word Hydrophones::regSetBits(word addr, word mask, bool value){
-	word data = spiRead(addr);
+Hydrophones::word_t Hydrophones::regSetBits(word_t addr, word_t mask, bool value)
+{
+	word_t data = spiRead(addr);
 	setBits(data, mask, value);
 	spiWrite(addr,data);
 	return data;
 }
 
-Hydrophones::word Hydrophones::regSetRange(word addr, int startPos, int endPos, word value){
-	word data = spiRead(addr);
+Hydrophones::word_t Hydrophones::regSetRange(word_t addr, int startPos, int endPos, word_t value)
+{
+	word_t data = spiRead(addr);
 
 	//mask for setting zeros to ones
-	word mask = value << startPos;
+	word_t mask = value << startPos;
 
 	data |= mask;
 
@@ -192,9 +272,21 @@ Hydrophones::word Hydrophones::regSetRange(word addr, int startPos, int endPos, 
 	return data;
 }
 
-void Hydrophones::sample(float secs){
+Hydrophones::raspiReg_t Hydrophones::readGPIOBank()
+{
+	if(!gpioRegOpen_)
+	{
+		ROS_ERROR("Can't read GPIO register; failed to open.");
+		return 0;
+	}
+	unsigned int GPIO_LEV_0 = 13;
+	return *(gpioReg_ + GPIO_LEV_0);
+}
 
-	rawSamples = std::vector<raspiReg>();
+void Hydrophones::sample(float secs)
+{
+
+	rawSamples = std::vector<raspiReg_t>();
 	samplesProcessed = false;
 
 	clock_t numTicks = secs * CLOCKS_PER_SEC;
@@ -202,18 +294,23 @@ void Hydrophones::sample(float secs){
 	bool prevSclk = true;
 	clock_t t = clock();
 	startAquisition();
-	while(!dataReady()) continue;
+	while(!dataReady() && ros::ok())
+	{
+		std::string isError = spiRead(ASIL_FLAG)? "due to an ASIL error." : "not due to an ASIL error.";
+		ROS_WARN("Data not ready. This was %s", isError.c_str());
+	}
 	//If needed: approximate clock cycles per loop, and just loop that many times
 	bool sclk;
 	do{
 		sclk = clockState();
 		if(!sclk && prevSclk){
-			rawSamples.push_back(*RPI_GLILEV0);
+			raspiReg_t val = readGPIOBank();
+			rawSamples.push_back(val);
 		}
 		prevSclk = sclk;
-	}while(clock() - t < numTicks)
+	}while(clock() - t < numTicks);
 
-	sampling = false;
+	stopAquisition();
 
 	//write to txt
 	std::string path = rawFilePath + "/" + std::to_string(sampleCounter);
@@ -237,14 +334,14 @@ void Hydrophones::processSamples(){
 	}
 
 	for(int i = 0; i < len/2; ++i){
-		raspiReg highReg = rawSamples.at(2*i);
-		raspiReg lowReg = rawSamples.at(2*i+1);
+		raspiReg_t highReg = rawSamples.at(2*i);
+		raspiReg_t lowReg = rawSamples.at(2*i+1);
 
 		uint8_t msb = getByteFromReg(highReg);
 		uint8_t lsb = getByteFromReg(lowReg);
 
 		//assemble the bits
-		word sample = (msb << 8) | lsb;
+		word_t sample = (msb << 8) | lsb;
 		samples.push_back(sample);
 	}
 
@@ -257,22 +354,26 @@ void Hydrophones::processSamples(){
 		file << i << std::endl;
 }
 
-uint8_t Hydrophones::getByteFromReg(raspiReg reg){
+uint8_t Hydrophones::getByteFromReg(raspiReg_t reg){
 	uint8_t result = 0;
 	for(int i = 0; i < 8; ++i){
 		int pos = dataPins[i];
 
 		//wipe out all the bits but the one we care about
-		raspiReg mask = (1 << pos);
+		raspiReg_t mask = (1 << pos);
 		uint8_t bit= (mask & pos) >> pos;
 		result |= (bit << i);
 	}
 	return result;
 }
 
-int main(){
-	Hydrophones system;
+} // namespace MuddSub::Acoustics
 
-
+int main(int argc, char** argv){
+	ros::init(argc, argv, "HydrophonesDriver");
+	MuddSub::Acoustics::Hydrophones system;
+	// std::cout << system.readGPIOBank() << std::endl;
+	system.sample(1);
+	// system.processSamples();
 	return 0;
 }

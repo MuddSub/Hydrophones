@@ -3,7 +3,7 @@
 
 
 
-
+//ADC registers, accessed via i2c port
 #define CLK_CTRL  (0x000)
 #define PLL_DEN (0x001)
 #define PLL_NUM (0x002)
@@ -79,6 +79,12 @@
 #define RPI_DATA_READY_PIN 22     //BCM 6
 #define RPI_SCLK_ADC_PIN 21       //BCM 5
 
+
+unsigned short raspiInputPins[6] = {RPI_SCLK_ADC_PIN, RPI_DATA_READY_PIN, RPI_N_FAULT_PIN};
+unsigned short raspiOutputPins[5] = {RPI_N_CONV_START_PIN, RPI_N_STATUS_R_PIN, RPI_N_STATUS_G_PIN, RPI_N_STATUS_B_PIN, RPI_N_RESET_PWDN_PIN};
+
+
+
 //These are in terms of the broadcom pins, because that's how we read them
 #define DIN_PIN_0 24
 #define DIN_PIN_1 22
@@ -90,7 +96,8 @@
 #define DIN_PIN_7 14
 
 
+
 volatile uint32_t* const  RPI_GPILEV0 = (uint32_t*) 0x7E200034;
-volatile uint32_t* const  RPI_GLILEV1 = (uint32_t*) 0x7E200038;
+volatile uint32_t* const  RPI_GPILEV1 = (uint32_t*) 0x7E200038;
 
 #endif
